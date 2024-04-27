@@ -1,44 +1,40 @@
 import os
 import time
-import wave
 from ws4py.client.threadedclient import WebSocketClient
 
 audioFilename = "./assets/sample.mp3"
 websocketHost = "127.0.0.1"
 websocketPort = 9000
-websocketUrl = "ws://" + websocketHost + ":" + str(websocketPort) + "/ws"
-bitRate = 1024 * 128  # 128 Kbps bits per second
-chunkSize = bitRate // 8  # Convert bits to bytes
+websocketUrl = f"ws://{websocketHost}:{websocketPort}/ws"
+bitRate = 128 * 1024  # 128 kbps in bps
+chunkSize = (bitRate // 8)  # Convert bits to bytes
 chunkDuration = 1   # one second chunks
+
+# Read file size to calculate total chunks once
+fileSize = os.path.getsize(audioFilename)
+totalChunks = (fileSize + chunkSize - 1) // chunkSize
 
 
 class AFlowPublisher(WebSocketClient):
 
     def opened(self):
-        if(".mp3" in audioFilename or ".wav" in audioFilename):
+        if audioFilename.endswith((".mp3", ".wav")):
             with open(audioFilename, "rb") as audioFile:
                 print(f"Opened connection, starting to send audio file")
 
-                totalChunks = self.getTotalChunk()
-                print(f"Total chunks ", totalChunks)
-
-                audioChunk = audioFile.read(chunkSize)
-                currentChunk = 1
-                while audioChunk:
-                    print(
-                        f"Sending audio chunk | {currentChunk} / {totalChunks} of size {chunkSize}")
+                for currentChunk in range(totalChunks):
                     startTime = time.time()
-                    self.send(audioChunk, binary=True)
                     audioChunk = audioFile.read(chunkSize)
+                    print(
+                        f"Sending audio chunk : {currentChunk} / {totalChunks} of size {chunkSize}")
+                    self.send(audioChunk, binary=True)
 
                     # sleep to maintain the bitrate
                     timeToSleep = chunkDuration - (time.time() - startTime)
-                    print(f"sleep for a while | {timeToSleep}")
+                    print(f"sleep for a while : {timeToSleep} secs")
                     if timeToSleep > 0:
                         time.sleep(timeToSleep)
 
-                    # keep track of the current chunk
-                    currentChunk += 1
         else:
             print(f"Only MP3 and WAV file are supported")
 
@@ -47,16 +43,6 @@ class AFlowPublisher(WebSocketClient):
 
     def received_message(self, message):
         print(f"Received a message.")
-
-    def getTotalChunk(self):
-        totalChunks = 0
-        fileSize = os.path.getsize(audioFilename)
-
-        while fileSize > 0:
-            totalChunks += 1
-            #totalChunkSize += chunkSize
-            fileSize -= chunkSize
-        return totalChunks
 
 
 if __name__ == '__main__':
