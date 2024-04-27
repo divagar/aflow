@@ -7,7 +7,9 @@ audioFilename = "./assets/sample.mp3"
 websocketHost = "127.0.0.1"
 websocketPort = 9000
 websocketUrl = "ws://" + websocketHost + ":" + str(websocketPort) + "/ws"
-chunkSize = 1024 * 128  # 128 Kbps
+bitRate = 1024 * 128  # 128 Kbps bits per second
+chunkSize = bitRate // 8  # Convert bits to bytes
+chunkDuration = 1   # one second chunks
 
 
 class AFlowPublisher(WebSocketClient):
@@ -18,16 +20,24 @@ class AFlowPublisher(WebSocketClient):
                 print(f"Opened connection, starting to send audio file")
 
                 totalChunks = self.getTotalChunk()
-                print(f"Computing total chunks ", totalChunks)
+                print(f"Total chunks ", totalChunks)
 
                 audioChunk = audioFile.read(chunkSize)
                 currentChunk = 1
                 while audioChunk:
                     print(
-                        f"Sending audio chunk {currentChunk} / {totalChunks} of size {chunkSize}")
+                        f"Sending audio chunk | {currentChunk} / {totalChunks} of size {chunkSize}")
+                    startTime = time.time()
                     self.send(audioChunk, binary=True)
                     audioChunk = audioFile.read(chunkSize)
-                    time.sleep(0.1)  # sleep for n/w time taken to send data
+
+                    # sleep to maintain the bitrate
+                    timeToSleep = chunkDuration - (time.time() - startTime)
+                    print(f"sleep for a while | {timeToSleep}")
+                    if timeToSleep > 0:
+                        time.sleep(timeToSleep)
+
+                    # keep track of the current chunk
                     currentChunk += 1
         else:
             print(f"Only MP3 and WAV file are supported")
