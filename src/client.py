@@ -1,31 +1,34 @@
 import time
 from ws4py.client.threadedclient import WebSocketClient
+audioFilename = "./assets/sample.mp3"
+websocketHost = "127.0.0.1"
+websocketPort = 9000
+websocketUrl = "ws://" + websocketHost + ":" + str(websocketPort) + "/ws"
 
 
 class AudioFileClient(WebSocketClient):
     def opened(self):
-        # Let's send the audio file in chunks
-        with open("./assets/sample.mp3", "rb") as audio_file:
-            # Sending data in small chunks, you can define the chunk size
-            chunk_size = 1024
-            chunk = audio_file.read(chunk_size)
-            while chunk:
+
+        with open(audioFilename, "rb") as audioFile:
+            print(f"Opened connection, starting to send audio file")
+            chunkSize = 1024
+            audioChuck = audioFile.read(chunkSize)
+            while audioChuck:
                 print(f"Sending audio chuck")
-                self.send(chunk, binary=True)
-                chunk = audio_file.read(chunk_size)
-                time.sleep(0.1)  # Just to simulate time taken to send data
+                self.send(audioChuck, binary=True)
+                audioChuck = audioFile.read(chunkSize)
+                time.sleep(0.1)  # sleep for n/w time taken to send data
 
     def closed(self, code, reason=None):
-        print(f"Closed down with code: {code}, reason: {reason}")
+        print(f"Closed connection with code: {code}, reason: {reason}")
 
     def received_message(self, message):
-        print(f"Received a message, but this client doesn't do anything with it.")
+        print(f"Received a message.")
 
 
 if __name__ == '__main__':
     try:
-        ws = AudioFileClient('ws://127.0.0.1:8765/ws',
-                             protocols=['http-only', 'chat'])
+        ws = AudioFileClient(websocketUrl)
         ws.connect()
         ws.run_forever()
     except KeyboardInterrupt:

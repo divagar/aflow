@@ -2,9 +2,9 @@ import cherrypy
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
-# Configure the port
-cherrypy.config.update({'server.socket_port': 8765})
-
+websocketHost = "127.0.0.1"
+websocketPort = 9000
+cherrypy.config.update({'server.socket_port': websocketPort})
 
 class AudioWebSocket(WebSocket):
     def received_message(self, message):
