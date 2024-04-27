@@ -18,7 +18,6 @@ class AudioWebSocket(WebSocket):
 class Root(object):
     @cherrypy.expose
     def index(self):
-        # Serve some HTML to the client
         return "WebSocket server is running..."
 
     @cherrypy.expose
