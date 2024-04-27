@@ -2,28 +2,30 @@ import cherrypy
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
-websocketHost = "127.0.0.1"
+audioFilename = "./assets/out.mp3"
+websocketHost = "0.0.0.0"
 websocketPort = 9000
-cherrypy.config.update({'server.socket_port': websocketPort})
+cherrypy.config.update(
+    {'server.socket_port': websocketPort,   'server.socket_port': websocketPort})
+
 
 class AudioWebSocket(WebSocket):
     def received_message(self, message):
-        # Assuming binary audio data
-        # Since this is an echo server, we'll just send the data back
-        print(f"Received message, is binary: {message.is_binary}")
+        print(f"Received message")
         if message.is_binary:
-            self.send(message.data)
+            with open(audioFilename, "ab") as audio_file:
+                audio_file.write(message.data)
 
 
 class Root(object):
     @cherrypy.expose
     def index(self):
-        return "WebSocket server is running..."
+        return f"WebSocket server is ready to receive audio stream at ws://{websocketHost}:{websocketPort}/ws"
 
     @cherrypy.expose
     def ws(self):
-        """Method must exist to serve as a 'target' for the WebSocket"""
-        handler = cherrypy.request.ws_handler
+        # WebSocket endpoint
+        pass
 
 
 # Register the WebSocket tool
