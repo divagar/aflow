@@ -2,11 +2,11 @@ import cherrypy
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 
-audioFilename = "./assets/out.mp3"
+audioFilename = "/tmp/out.mp3"
 websocketHost = "0.0.0.0"
 websocketPort = 9000
 cherrypy.config.update(
-    {'server.socket_port': websocketPort,   'server.socket_port': websocketPort})
+    {'server.socket_host': websocketHost,   'server.socket_port': websocketPort})
 
 
 class AudioWebSocket(WebSocket):
