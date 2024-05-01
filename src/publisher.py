@@ -41,13 +41,13 @@ def runCommand(command):
 
 
 def getRecoderCardNumber():
-    cmd = "arecord -l | grep -i dmic | awk 'NR==1 {$2=substr($2,1,length($2)-1); print $2}'"
+    cmd = "arecord -l | grep -i dmic | awk 'NR==1 {for(i=1;i<=NF;i++) if($i==\"card\") {$(i+1)=substr($(i+1),1,length($(i+1))-1); print $(i+1)}}'"
     result = runCommand(cmd)
     return result
 
 
 def getRecoderDeviceNumber():
-    cmd = "arecord -l | grep -i dmic | awk 'NR==1 {$6=substr($6,1,length($6)-1); print $6}'"
+    cmd = "arecord -l | grep -i dmic | awk 'NR==1 {for(i=1;i<=NF;i++) if($i==\"device\") {$(i+1)=substr($(i+1),1,length($(i+1))-1); print $(i+1)}}'"
     result = runCommand(cmd)
     return result
 
