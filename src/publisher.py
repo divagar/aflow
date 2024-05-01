@@ -40,13 +40,13 @@ def runCommand(command):
         return None
 
 
-def getMicCardNumber():
+def getRecoderCardNumber():
     cmd = "arecord -l | grep -i dmic | awk 'NR==1 {$2=substr($2,1,length($2)-1); print $2}'"
     result = runCommand(cmd)
     return result
 
 
-def getMicDeviceNumber():
+def getRecoderDeviceNumber():
     cmd = "arecord -l | grep -i dmic | awk 'NR==1 {$6=substr($6,1,length($6)-1); print $6}'"
     result = runCommand(cmd)
     return result
@@ -62,8 +62,8 @@ if args.mode == "offline":
 if args.mode == "realtime":
     if args.card is None or args.device is None:
         # try to get the mic card and device id
-        args.card = getMicCardNumber()
-        args.device = getMicDeviceNumber()
+        args.card = getRecoderCardNumber()
+        args.device = getRecoderDeviceNumber()
     if args.card is None or args.device is None:
         parser.error(
             "--card and --device arguments are required in realtime mode")
@@ -73,37 +73,48 @@ class AFlowPublisher(WebSocketClient):
 
     def opened(self):
         if args.mode == "offline":
-            self.stream_from_file(args.file)
+            self.streamViaFile(args.file)
         elif args.mode == "realtime":
-            self.stream_from_mic()
+            self.streamViaRecoder()
 
-    def stream_from_file(self, audioFilename):
+    def closed(self, code, reason=None):
+        print(f"Closed connection with code: {code}, reason: {reason}")
+
+    def received_message(self, message):
+        print(f"Received a message.")
+
+    def send_message(self, message, count=1):
+        print(f"Send a message | count: {count}", end=" ")
+        self.send(message, binary=True)
+
+    def streamViaFile(self, audioFilename):
         if audioFilename.endswith((".mp3", ".wav")):
             # Read file size to calculate total chunks once
             fileSize = os.path.getsize(audioFilename)
             totalChunks = (fileSize + chunkSize - 1) // chunkSize
 
             with open(audioFilename, "rb") as audioFile:
-                print(f"Opened connection, starting to send audio file")
+                print(f"Starting the realtime audio stream via file mode")
 
                 for currentChunk in range(totalChunks):
                     startTime = time.time()
                     audioChunk = audioFile.read(chunkSize)
                     print(
-                        f"Sending audio chunk : {currentChunk} / {totalChunks} of size {chunkSize}")
-                    self.send(audioChunk, binary=True)
+                        f"Sending audio chunk : {currentChunk} / {totalChunks} of size {chunkSize}", end=" ")
+                    self.send_message(audioChunk, currentChunk)
 
                     # sleep to maintain the bitrate
                     timeToSleep = chunkDuration - (time.time() - startTime)
-                    print(f"sleep for a while : {timeToSleep} secs")
+                    print(f"sleep for a while : {timeToSleep} secs", end=" ")
                     if timeToSleep > 0:
                         time.sleep(timeToSleep)
+            print(f"End of realtime audio stream via file mode")
 
         else:
             print(f"Only MP3 and WAV file are supported")
 
-    def stream_from_mic(self):
-        # Arecord command with card and device
+    def streamViaRecoder(self):
+        currentChunk = 1
         arecord_cmd = [
             'arecord',
             '--duration=30',
@@ -112,27 +123,24 @@ class AFlowPublisher(WebSocketClient):
             '--channels=4',
             f'--device=hw:{args.card},{args.device}'
         ]
-
         # Start the arecord process
-        arecord_process = subprocess.Popen(arecord_cmd, stdout=subprocess.PIPE)
-
+        arecordProcess = subprocess.Popen(arecord_cmd, stdout=subprocess.PIPE)
         try:
+            print(f"Starting the realtime audio stream via recoder mode")
             while True:
-                audioChunk = arecord_process.stdout.read(chunkSize)
+                audioChunk = arecordProcess.stdout.read(chunkSize)
                 if not audioChunk:
+                    # end the stream
+                    print(f"End of realtime audio stream via recoder mode")
                     break
-                self.send(audioChunk, binary=True)
+                # send audio chuck
+                self.send_message(audioChunk, currentChunk)
+                currentChunk += 1
                 # No need to sleep since arecord will output at the recording rate
         except Exception as e:
             print(e)
         finally:
-            arecord_process.kill()
-
-    def closed(self, code, reason=None):
-        print(f"Closed connection with code: {code}, reason: {reason}")
-
-    def received_message(self, message):
-        print(f"Received a message.")
+            arecordProcess.kill()
 
 
 if __name__ == '__main__':
