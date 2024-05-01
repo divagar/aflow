@@ -2,7 +2,6 @@ import os
 import time
 import argparse
 import subprocess
-import threading
 from ws4py.client.threadedclient import WebSocketClient
 
 parser = argparse.ArgumentParser(
@@ -23,6 +22,36 @@ parser.add_argument("--device", default=None,
                     help="ALSA device number", type=str)
 args = parser.parse_args()
 
+
+websocketUrl = f"ws://{args.host}:{args.port}/ws"
+bitrate = args.bitrate * 1024  # kbps to bps
+# Convert bits to bytes, then get 100ms chunks
+chunkSize = (bitrate // 8)
+chunkDuration = 1  # 100 ms chunks
+
+
+def runCommand(command):
+    try:
+        result = subprocess.run(command, shell=True, check=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        print(f'An error occurred while running the command: {e.stderr}')
+        return None
+
+
+def getMicCardNumber():
+    cmd = "arecord -l | grep -i dmic | awk 'NR==1 {$2=substr($2,1,length($2)-1); print $2}'"
+    result = runCommand(cmd)
+    return result
+
+
+def getMicDeviceNumber():
+    cmd = "arecord -l | grep -i dmic | awk 'NR==1 {$6=substr($6,1,length($6)-1); print $6}'"
+    result = runCommand(cmd)
+    return result
+
+
 # Ensure --file is provided in offline mode
 if args.mode == "offline":
     if args.file is None:
@@ -32,14 +61,12 @@ if args.mode == "offline":
 # Ensure --card and --device are provided in realtime mode
 if args.mode == "realtime":
     if args.card is None or args.device is None:
+        # try to get the mic card and device id
+        args.card = getMicCardNumber()
+        args.device = getMicDeviceNumber()
+    if args.card is None or args.device is None:
         parser.error(
             "--card and --device arguments are required in realtime mode")
-
-websocketUrl = f"ws://{args.host}:{args.port}/ws"
-bitrate = args.bitrate * 1024  # kbps to bps
-# Convert bits to bytes, then get 100ms chunks
-chunkSize = (bitrate // 8)
-chunkDuration = 1  # 100 ms chunks
 
 
 class AFlowPublisher(WebSocketClient):
@@ -79,9 +106,10 @@ class AFlowPublisher(WebSocketClient):
         # Arecord command with card and device
         arecord_cmd = [
             'arecord',
-            '--format=S16_LE',
-            '--rate=44100',
-            '--channels=1',
+            '--duration=30',
+            '--format=s32_le',
+            '--rate=48000',
+            '--channels=4',
             f'--device=hw:{args.card},{args.device}'
         ]
 
