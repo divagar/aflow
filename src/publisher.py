@@ -29,6 +29,11 @@ bitrate = args.bitrate * 1024  # kbps to bps
 chunkSize = (bitrate // 8)
 chunkDuration = 1  # 100 ms chunks
 
+audioRecordDuration = 30
+audioFormat = "s32_le"
+audioSampleRate = 48000
+audioChannels = 4
+
 
 def runCommand(command):
     try:
@@ -84,7 +89,7 @@ class AFlowPublisher(WebSocketClient):
         print(f"Received a message.")
 
     def send_message(self, message, count=1):
-        print(f"Send a message | count: {count}", end=" ")
+        print(f"Send a message | count: {count}")
         self.send(message, binary=True)
 
     def streamViaFile(self, audioFilename):
@@ -100,12 +105,12 @@ class AFlowPublisher(WebSocketClient):
                     startTime = time.time()
                     audioChunk = audioFile.read(chunkSize)
                     print(
-                        f"Sending audio chunk : {currentChunk} / {totalChunks} of size {chunkSize}", end=" ")
+                        f"Sending audio chunk : {currentChunk} / {totalChunks} of size {chunkSize}")
                     self.send_message(audioChunk, currentChunk)
 
                     # sleep to maintain the bitrate
                     timeToSleep = chunkDuration - (time.time() - startTime)
-                    print(f"sleep for a while : {timeToSleep} secs", end=" ")
+                    print(f"sleep for a while : {timeToSleep} secs")
                     if timeToSleep > 0:
                         time.sleep(timeToSleep)
             print(f"End of realtime audio stream via file mode")
@@ -117,10 +122,10 @@ class AFlowPublisher(WebSocketClient):
         currentChunk = 1
         arecord_cmd = [
             'arecord',
-            '--duration=30',
-            '--format=s32_le',
-            '--rate=48000',
-            '--channels=4',
+            '--duration='+str(audioRecordDuration),
+            '--format=' + str(audioFormat),
+            '--rate=' + str(audioSampleRate),
+            '--channels=' + str(audioChannels),
             f'--device=hw:{args.card},{args.device}'
         ]
         # Start the arecord process
