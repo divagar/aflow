@@ -1,5 +1,7 @@
 import os
 import time
+import struct
+import wave
 import argparse
 import subprocess
 from ws4py.client.threadedclient import WebSocketClient
@@ -15,7 +17,7 @@ parser.add_argument("--bitrate", default=128, type=int,
                     help="Audio bitrate in kbps")
 parser.add_argument(
     "--mode", choices=["offline", "realtime"], default="offline", help="Streaming mode")
-parser.add_argument("--file", default="./assets/sample.mp3",
+parser.add_argument("--file", default="./assets/sample.wav",
                     help="Audio file to stream in offline mode")
 parser.add_argument("--card", default=None, help="ALSA card number", type=str)
 parser.add_argument("--device", default=None,
@@ -28,10 +30,12 @@ bitrate = args.bitrate * 1024  # kbps to bps
 # Convert bits to bytes, then get 100ms chunks
 chunkSize = (bitrate // 8)
 chunkDuration = 1  # 100 ms chunks
+chunkLengthInSecs = 2  # 2secs chunks
 
 audioRecordDuration = 30
 audioFormat = "s32_le"
 audioSampleRate = 48000
+audioSampleWidth = None
 audioChannels = 4
 
 
@@ -55,6 +59,43 @@ def getRecoderDeviceNumber():
     cmd = "arecord -l | grep -i dmic | awk 'NR==1 {for(i=1;i<=NF;i++) if($i==\"device\") {$(i+1)=substr($(i+1),1,length($(i+1))-1); print $(i+1)}}'"
     result = runCommand(cmd)
     return result
+
+
+def isWAVFile(file):
+    try:
+        with wave.open(file, 'rb') as f:
+            return True
+    except wave.Error as e:
+        return False
+    except FileNotFoundError:
+        return False
+
+
+def readWavFileHeader(file):
+    with wave.open(file, 'rb') as wf:
+        channels = wf.getnchannels()
+        sampleRate = wf.getframerate()
+        bitsPerSample = wf.getsampwidth() * 8
+        totalDataSize = wf.getnframes() * channels * (bitsPerSample // 8)
+        print(f"wf.getnframes()= {wf.getnframes()}")
+
+    return channels, sampleRate, bitsPerSample, totalDataSize
+
+
+def generateWavFileHeader(channels, sampleRate, bitsPerSample, numOfFrames):
+    bytes_per_sample = bitsPerSample // 8
+    block_align = channels * bytes_per_sample
+    byte_rate = sampleRate * block_align
+    subchunk2_size = numOfFrames * block_align
+
+    header = (b'RIFF' +
+              struct.pack('<I', 36 + subchunk2_size) +
+              b'WAVE' +
+              b'fmt ' +
+              struct.pack('<IHHIIHH', 16, 1, channels, sampleRate, byte_rate, block_align, bitsPerSample) +
+              b'data' +
+              struct.pack('<I', subchunk2_size))
+    return header
 
 
 # Ensure --file is provided in offline mode
@@ -93,20 +134,40 @@ class AFlowPublisher(WebSocketClient):
         self.send(message, binary=True)
 
     def streamViaFile(self, audioFilename):
-        if audioFilename.endswith((".mp3", ".wav")):
+        if audioFilename.endswith((".wav")) and isWAVFile(audioFilename):
+
+            # get wave header info
+            audioChannels, audioSampleRate, audioBitsPerSample, audioTotalDataSize = readWavFileHeader(
+                audioFilename)
+            print(f"audioChannels = {audioChannels} audioSampleRate = {audioSampleRate} audioBitsPerSample = {audioBitsPerSample} audioTotalDataSize = {audioTotalDataSize}")
+
+            # Calculate frame size, frames per chunk and bytes per chunk
+            frameSize = audioChannels * (audioBitsPerSample // 8)
+            framesPerChunk = audioSampleRate * chunkLengthInSecs
+            bytesPerChunk = framesPerChunk * frameSize
+
             # Read file size to calculate total chunks once
             fileSize = os.path.getsize(audioFilename)
-            totalChunks = (fileSize + chunkSize - 1) // chunkSize
+            #totalChunks = (fileSize + chunkSize - 1) // chunkSize
 
             with open(audioFilename, "rb") as audioFile:
                 print(f"Starting the realtime audio stream via file mode")
 
-                for currentChunk in range(totalChunks):
+                audioFile.seek(44)  # Typical WAV header length
+
+                while audioTotalDataSize > 0:
                     startTime = time.time()
+                    chunkSize = min(bytesPerChunk, audioTotalDataSize)
                     audioChunk = audioFile.read(chunkSize)
-                    print(
-                        f"Sending audio chunk : {currentChunk} / {totalChunks} of size {chunkSize}")
-                    self.send_message(audioChunk, currentChunk)
+                    audioTotalDataSize -= chunkSize
+
+                    #print(f"Sending audio chunk : {currentChunk} / {totalChunks} of size {chunkSize}")
+
+                    numsFramesInChunk = len(audioChunk)
+                    audioChunkHeader = generateWavFileHeader(
+                        audioChannels, audioSampleRate, audioBitsPerSample, numsFramesInChunk)
+
+                    self.send_message(audioChunkHeader + audioChunk)
 
                     # sleep to maintain the bitrate
                     timeToSleep = chunkDuration - (time.time() - startTime)
@@ -116,7 +177,7 @@ class AFlowPublisher(WebSocketClient):
             print(f"End of realtime audio stream via file mode")
 
         else:
-            print(f"Only MP3 and WAV file are supported")
+            print(f"Only WAV file are supported")
 
     def streamViaRecoder(self):
         currentChunk = 1
