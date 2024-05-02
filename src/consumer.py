@@ -1,20 +1,29 @@
 import cherrypy
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
+import random
 
-audioFilename = "/tmp/out.mp3"
+from algo.silence import isSilent
+
+audioFilename = "/tmp/"
 websocketHost = "0.0.0.0"
 websocketPort = 9000
 cherrypy.config.update(
     {'server.socket_host': websocketHost,   'server.socket_port': websocketPort})
 
 
+
 class AudioWebSocket(WebSocket):
     def received_message(self, message):
-        print(f"Received message")
+        count = random.randint(0, 200)
+        print(f"Received message {count}")
         if message.is_binary:
-            with open(audioFilename, "ab") as audio_file:
+            fName = audioFilename + "out_" + str(count) + ".mp3"
+            with open(fName, "ab") as audio_file:
                 audio_file.write(message.data)
+                # check silence
+                isSilent(message.data)
+        count += 1
 
 
 class Root(object):
