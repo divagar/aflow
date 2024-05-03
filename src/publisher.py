@@ -36,7 +36,7 @@ audioDeviceNumber = args.device
 audioRecordDuration = 30
 audioFormat = "s32_le"
 audioSampleRate = 48000
-audioSampleWidth = None
+audioBitsPerSample = 32
 audioChannels = 4
 
 # Configs for offline mode
@@ -190,7 +190,7 @@ class AFlowPublisher(WebSocketClient):
             print(f"Only WAV file are supported")
 
     def streamViaRecoder(self):
-        currentChunk = 1
+        audioChunkCount = 1
         arecord_cmd = [
             'arecord',
             '--duration='+str(audioRecordDuration),
@@ -199,6 +199,13 @@ class AFlowPublisher(WebSocketClient):
             '--channels=' + str(audioChannels),
             f'--device=hw:{audioCardNumber},{audioDeviceNumber}'
         ]
+
+        # Calculate frame size, frames per chunk and bytes per chunk
+        frameSize = audioChannels * (audioBitsPerSample // 8)
+        framesPerChunk = audioSampleRate * audioChunkLengthInSecs
+        bytesPerChunk = framesPerChunk * frameSize
+        chunkSize = bytesPerChunk
+
         # Start the arecord process
         arecordProcess = subprocess.Popen(arecord_cmd, stdout=subprocess.PIPE)
         try:
@@ -209,10 +216,16 @@ class AFlowPublisher(WebSocketClient):
                     # end the stream
                     print(f"End of realtime audio stream via recoder mode")
                     break
-                # send audio chuck
-                self.send_message(audioChunk, currentChunk)
-                currentChunk += 1
-                # No need to sleep since arecord will output at the recording rate
+
+                # generate the wav file header
+                numsFramesInChunk = len(audioChunk)
+                audioChunkHeader = generateWavFileHeader(
+                    audioChannels, audioSampleRate, audioBitsPerSample, numsFramesInChunk)
+
+                # send audio chunk over web socker
+                self.send_message(audioChunkHeader +
+                                  audioChunk, audioChunkCount)
+                audioChunkCount += 1
         except Exception as e:
             print(e)
         finally:
