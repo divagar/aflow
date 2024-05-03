@@ -85,7 +85,6 @@ def readWavFileHeader(file):
         sampleRate = wf.getframerate()
         bitsPerSample = wf.getsampwidth() * 8
         totalDataSize = wf.getnframes() * channels * (bitsPerSample // 8)
-        print(f"wf.getnframes()= {wf.getnframes()}")
 
     return channels, sampleRate, bitsPerSample, totalDataSize
 
@@ -157,20 +156,27 @@ class AFlowPublisher(WebSocketClient):
 
             with open(audioFileName, "rb") as audioFile:
                 print(f"Starting the realtime audio stream via file mode")
+                audioChunkCount = 1
 
                 audioFile.seek(44)  # Typical WAV header length
 
                 while audioTotalDataSize > 0:
                     startTime = time.time()
+
+                    # read the chunk from the file
                     chunkSize = min(bytesPerChunk, audioTotalDataSize)
                     audioChunk = audioFile.read(chunkSize)
                     audioTotalDataSize -= chunkSize
 
+                    # generate the wav file header
                     numsFramesInChunk = len(audioChunk)
                     audioChunkHeader = generateWavFileHeader(
                         audioChannels, audioSampleRate, audioBitsPerSample, numsFramesInChunk)
 
-                    self.send_message(audioChunkHeader + audioChunk)
+                    # send audio chunk over web socker
+                    self.send_message(audioChunkHeader +
+                                      audioChunk, audioChunkCount)
+                    audioChunkCount += 1
 
                     # sleep to maintain the bitrate
                     timeToSleep = audioChunkDuration - \
