@@ -5,6 +5,7 @@ import random
 
 from algo.silence.silence import isSilent
 from algo.noise.noise import isNoisy
+from algo.asr.whisper import asr
 
 audioFilename = "/tmp/"
 websocketHost = "0.0.0.0"
@@ -27,6 +28,9 @@ class AudioWebSocket(WebSocket):
 
                 # check noise
                 isNoisy(message.data)
+                
+                # generate speech
+                asr(message.data)
         count += 1
 
 
