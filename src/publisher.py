@@ -13,8 +13,8 @@ parser.add_argument("--host", default="127.0.0.1",
                     help="WebSocket server host")
 parser.add_argument("--port", default=9000, type=int,
                     help="WebSocket server port")
-parser.add_argument("--bitrate", default=128, type=int,
-                    help="Audio bitrate in kbps")
+parser.add_argument("--chunklength", default=2, type=int,
+                    help="Audio chunk length in seconds")
 parser.add_argument(
     "--mode", choices=["offline", "realtime"], default="offline", help="Streaming mode")
 parser.add_argument("--file", default="./assets/sample.wav",
@@ -28,7 +28,7 @@ args = parser.parse_args()
 websocketUrl = f"ws://{args.host}:{args.port}/ws"
 mode = args.mode
 audioChunkDuration = 1  # 100 ms chunks
-audioChunkLengthInSecs = 2  # 2secs chunks
+audioChunkLengthInSecs = args.chunklength
 
 # Configs for realtime mode
 audioCardNumber = args.card
@@ -90,18 +90,18 @@ def readWavFileHeader(file):
 
 
 def generateWavFileHeader(channels, sampleRate, bitsPerSample, numOfFrames):
-    bytes_per_sample = bitsPerSample // 8
-    block_align = channels * bytes_per_sample
-    byte_rate = sampleRate * block_align
-    subchunk2_size = numOfFrames * block_align
+    bytesPerSample = bitsPerSample // 8
+    blockAlign = channels * bytesPerSample
+    byteRate = sampleRate * blockAlign
+    subchunk2Size = numOfFrames * blockAlign
 
     header = (b'RIFF' +
-              struct.pack('<I', 36 + subchunk2_size) +
+              struct.pack('<I', 36 + subchunk2Size) +
               b'WAVE' +
               b'fmt ' +
-              struct.pack('<IHHIIHH', 16, 1, channels, sampleRate, byte_rate, block_align, bitsPerSample) +
+              struct.pack('<IHHIIHH', 16, 1, channels, sampleRate, byteRate, blockAlign, bitsPerSample) +
               b'data' +
-              struct.pack('<I', subchunk2_size))
+              struct.pack('<I', subchunk2Size))
     return header
 
 
@@ -191,7 +191,7 @@ class AFlowPublisher(WebSocketClient):
 
     def streamViaRecoder(self):
         audioChunkCount = 1
-        arecord_cmd = [
+        arecordCmd = [
             'arecord',
             '--duration='+str(audioRecordDuration),
             '--format=' + str(audioFormat),
@@ -207,7 +207,7 @@ class AFlowPublisher(WebSocketClient):
         chunkSize = bytesPerChunk
 
         # Start the arecord process
-        arecordProcess = subprocess.Popen(arecord_cmd, stdout=subprocess.PIPE)
+        arecordProcess = subprocess.Popen(arecordCmd, stdout=subprocess.PIPE)
         try:
             print(f"Starting the realtime audio stream via recoder mode")
             while True:
