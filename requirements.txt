@@ -7,3 +7,4 @@ transformers==4.40.1
 datasets==2.19.0
 torch==2.3.0
 evaluate==0.4.2
+fastapi==0.111.0
