@@ -11,16 +11,6 @@ def isSilent(data):
         adata = io.BytesIO(data)
         data, sr = sf.read(adata)
 
-        #sr = 44100
-        # Convert the chunk to an array of integers
-        #chunk_data = np.frombuffer(data, dtype=np.int16)
-
-        # Convert to float and normalize to range [-1, 1] if required
-        #chunk_normalized = chunk_data.astype(np.float32) / np.iinfo(np.int16).max
-
-        # You might need to reshape the chunk and interleave channels if there are more than one
-        #data = chunk_normalized.reshape(-1, 2)
-            
         # Reading audio files using PySoundFile is similmar to the method in librosa.
         # One important difference is that the read data is of shape (nb_samples, nb_channels)
         # compared to (nb_channels, nb_samples) in <librosa.core.load>.
