@@ -1,13 +1,14 @@
 import io
+import asyncio
 import librosa
 import soundfile as sf
 import numpy as np
 
 
-def isSilent(data):
+async def isSilent(data):
     ret = False
     try:
-        print("Checking silence in the audio data")
+        print("--- Checking silence in the audio data ---")
         adata = io.BytesIO(data)
         data, sr = sf.read(adata)
 
@@ -32,10 +33,10 @@ def isSilent(data):
         energy = librosa.feature.rms(S=librosa.db_to_amplitude(sDBa))
 
         # print(energy)
-        print(np.min(energy), np.max(energy))
+        #print(np.min(energy), np.max(energy))
         ret = np.max(energy) < 0.00001
     except Exception as e:
-        print("Error occured which checking for silence in audio data")
+        print("Error occured when checking for silence in audio data")
         print(str(e))
         ret = False
     finally:

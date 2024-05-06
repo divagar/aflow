@@ -1,4 +1,5 @@
 import io
+import asyncio
 import librosa
 import soundfile as sf
 import numpy as np
@@ -6,10 +7,10 @@ import numpy as np
 noise_threshold_dB = -100.0
 
 
-def isNoisy(data):
+async def isNoisy(data):
     ret = False
     try:
-        print("Checking noise in the audio data")
+        print("--- Checking noise in the audio data ---")
         adata = io.BytesIO(data)
         data, sr = sf.read(adata)
 
@@ -36,10 +37,10 @@ def isNoisy(data):
 
         # Print detected noise segments
         if noiseSegments.size > 0:
-            print(f"Noise detected at {noiseSegments} seconds")
+            #print(f"Noise detected at {noiseSegments} seconds")
             ret = True
         else:
-            print("No significant noise detected in the audio data")
+            #print("No significant noise detected in the audio data")
             ret = False
 
     except Exception as e:

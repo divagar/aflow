@@ -1,4 +1,5 @@
 import io
+import asyncio
 import librosa
 import soundfile as sf
 import numpy as np
@@ -12,10 +13,10 @@ from evaluate import load
 processor = WhisperProcessor.from_pretrained("openai/whisper-tiny.en")
 model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
 
-def asr(data):
+async def asr(data):
     ret = None
     try:
-        print("Attempting ASR")
+        print("--- Attempting ASR using Whisper tiny model ---")
 
         adata = io.BytesIO(data)
         data, sr = sf.read(adata)

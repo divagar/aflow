@@ -2,6 +2,8 @@ import cherrypy
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 import random
+import asyncio
+import threading
 
 from algo.silence.silence import isSilent
 from algo.noise.noise import isNoisy
@@ -14,25 +16,53 @@ cherrypy.config.update(
     {'server.socket_host': websocketHost,   'server.socket_port': websocketPort})
 
 
+# Start a new event loop in a background thread
+# def startBackgroundLoop(loop):
+#     asyncio.set_event_loop(loop)
+#     loop.run_forever()
+
+# loop = asyncio.new_event_loop()
+# t = threading.Thread(target=startBackgroundLoop, args=(loop,), daemon=True)
+# t.start()
+
 class AudioWebSocket(WebSocket):
+    
     def received_message(self, message):
-        count = random.randint(0, 200)
-        print(f"Received message {count}")
+        # Since this is not an async method, use asyncio.run to call an async method
+        asyncio.run(self.handleMessage(message))
+        
+    async def handleMessage(self, message):
+        print(f"Received message")
         if message.is_binary:
-            fName = audioFilename + "out_" + str(count) + ".mp3"
-            with open(fName, "ab") as audio_file:
-                audio_file.write(message.data)
+            data = message.data
+            
+            # Run async tasks
+            tasks = [
+                asyncio.create_task(self.storageAudioChunks(data)),
+                asyncio.create_task(self.checkSilence(data)),
+                asyncio.create_task(self.checkNoise(data)),
+                asyncio.create_task(self.generateSpeech(data))
+            ]
+            # Await all tasks to complete
+            await asyncio.gather(*tasks)
 
-                # check silence
-                isSilent(message.data)
+    async def storageAudioChunks(self, data):
+        count = random.randint(0, 200)
+        fName = audioFilename + "out_" + str(count) + ".mp3"
+        with open(fName, "ab") as audioFile:
+            audioFile.write(data)
+            
+    async def checkSilence(self, data):
+        # The isSilent function must be an awaitable coroutine
+        return await isSilent(data)
 
-                # check noise
-                isNoisy(message.data)
-                
-                # generate speech
-                asr(message.data)
-        count += 1
+    async def checkNoise(self, data):
+        # The isNoisy function must be an awaitable coroutine
+        return await isNoisy(data)
 
+    async def generateSpeech(self, data):
+        # The asr function must be an awaitable coroutine
+        return await asr(data)
 
 class Root(object):
     @cherrypy.expose
@@ -60,5 +90,6 @@ cherrypy.tree.mount(Root(), '/', config={
 })
 
 if __name__ == '__main__':
+    cherrypy.engine.signals.subscribe()
     cherrypy.engine.start()
     cherrypy.engine.block()
