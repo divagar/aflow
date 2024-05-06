@@ -3,14 +3,14 @@ from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 import random
 
-from algo.silence import isSilent
+from algo.silence.silence import isSilent
+from algo.noise.noise import isNoisy
 
 audioFilename = "/tmp/"
 websocketHost = "0.0.0.0"
 websocketPort = 9000
 cherrypy.config.update(
     {'server.socket_host': websocketHost,   'server.socket_port': websocketPort})
-
 
 
 class AudioWebSocket(WebSocket):
@@ -21,8 +21,12 @@ class AudioWebSocket(WebSocket):
             fName = audioFilename + "out_" + str(count) + ".mp3"
             with open(fName, "ab") as audio_file:
                 audio_file.write(message.data)
+
                 # check silence
                 isSilent(message.data)
+
+                # check noise
+                isNoisy(message.data)
         count += 1
 
 
