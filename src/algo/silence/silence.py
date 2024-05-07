@@ -5,10 +5,10 @@ import soundfile as sf
 import numpy as np
 
 
-async def isSilent(data):
+async def isSilent(chunkId, data):
     ret = False
     try:
-        print("--- Checking silence in the audio data ---")
+        print(f"--- {chunkId} | Checking silence in the audio data ---")
         adata = io.BytesIO(data)
         data, sr = sf.read(adata)
 

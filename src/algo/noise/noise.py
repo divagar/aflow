@@ -7,10 +7,10 @@ import numpy as np
 noise_threshold_dB = -100.0
 
 
-async def isNoisy(data):
+async def isNoisy(chunkId, data):
     ret = False
     try:
-        print("--- Checking noise in the audio data ---")
+        print(f"--- {chunkId} | Checking noise in the audio data ---")
         adata = io.BytesIO(data)
         data, sr = sf.read(adata)
 

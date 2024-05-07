@@ -13,10 +13,10 @@ from evaluate import load
 processor = WhisperProcessor.from_pretrained("openai/whisper-tiny.en")
 model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
 
-async def asr(data):
+async def asr(chunkId, data):
     ret = None
     try:
-        print("--- Attempting ASR using Whisper tiny model ---")
+        print(f"--- {chunkId} | Attempting ASR using Whisper tiny model ---")
 
         adata = io.BytesIO(data)
         data, sr = sf.read(adata)
