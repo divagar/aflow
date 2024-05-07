@@ -104,6 +104,13 @@ def generateWavFileHeader(channels, sampleRate, bitsPerSample, numOfFrames):
               struct.pack('<I', subchunk2Size))
     return header
 
+def generateChunkMetadata(chunkId, chunkSize, channels, sampleRate):
+    # Simple binary structure to pack audio chunk metadata
+    # Metadata Format structure: chunkId (int), chunkSize (int), channels (int), sampleRate (int)
+    metadataFormat = '<I I I I'
+    metadata = struct.pack(metadataFormat, chunkId, chunkSize, channels, sampleRate)
+    
+    return metadata
 
 # Ensure --file is provided in offline mode
 if mode == "offline":
@@ -136,8 +143,8 @@ class AFlowPublisher(WebSocketClient):
     def received_message(self, message):
         print(f"Received a message.")
 
-    def send_message(self, message, count=1):
-        print(f"Send a message | count: {count}")
+    def send_message(self, message, id=1):
+        print(f"Send a message | count: {id}")
         self.send(message, binary=True)
 
     def streamViaFile(self):
@@ -172,9 +179,12 @@ class AFlowPublisher(WebSocketClient):
                     numsFramesInChunk = len(audioChunk)
                     audioChunkHeader = generateWavFileHeader(
                         audioChannels, audioSampleRate, audioBitsPerSample, numsFramesInChunk)
+                    
+                    # generate chunk metadata
+                    audioMetadata = generateChunkMetadata(audioChunkCount, chunkSize, audioChannels, audioSampleRate)
 
                     # send audio chunk over web socker
-                    self.send_message(audioChunkHeader +
+                    self.send_message(audioMetadata + audioChunkHeader +
                                       audioChunk, audioChunkCount)
                     audioChunkCount += 1
 
@@ -221,9 +231,12 @@ class AFlowPublisher(WebSocketClient):
                 numsFramesInChunk = len(audioChunk)
                 audioChunkHeader = generateWavFileHeader(
                     audioChannels, audioSampleRate, audioBitsPerSample, numsFramesInChunk)
+                
+                # generate chunk metadata
+                audioMetadata = generateChunkMetadata(audioChunkCount, chunkSize, audioChannels, audioSampleRate)
 
                 # send audio chunk over web socker
-                self.send_message(audioChunkHeader +
+                self.send_message(audioMetadata + audioChunkHeader +
                                   audioChunk, audioChunkCount)
                 audioChunkCount += 1
         except Exception as e:
