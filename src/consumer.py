@@ -1,3 +1,4 @@
+import struct
 import random
 import asyncio
 import uvicorn
@@ -15,15 +16,24 @@ audioFilename = Path("/tmp/")
 websocketHost = "0.0.0.0"
 websocketPort = 9000
 
-async def storageAudioChunks(data):
-    count = random.randint(0, 200)
-    audioFile = audioFilename / f"out_{count}.mp3"
+async def storageAudioChunks(chunkId, data):
+    audioFile = audioFilename / f"out_{chunkId}.mp3"
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, writeFile, audioFile, data)
 
 def writeFile(audioFile, data):
     with open(audioFile, "ab") as audioFile:
         audioFile.write(data)
+        
+def extractAudioMetaData(data):
+    # Simple binary structure to pack audio chunk metadata
+    # Metadata Format structure: chunkId (int), chunkSize (int), channels (int), sampleRate (int)
+    metadataFormat = '<I I I I'
+    metadataSize = struct.calcsize(metadataFormat)
+    metadataBytes = data[:metadataSize]
+    chunkId, chunkSize, channels, sampleRate = struct.unpack(metadataFormat, metadataBytes)
+    
+    return metadataSize, chunkId, chunkSize, channels, sampleRate
 
 # Define a WS endpoint
 @app.websocket("/ws")
@@ -32,14 +42,21 @@ async def wsEndpoint(websocket: WebSocket):
     try:
         while True:
             # Get data
-            data = await websocket.receive_bytes()
+            audioData = await websocket.receive_bytes()
+            
+            # extract metadata
+            metadataSize, chunkId, chunkSize, channels, sampleRate = extractAudioMetaData(audioData)
+            print(f"Proccessing Chunk {chunkId} | chunkSize {chunkSize} | channels {channels} | sampleRate {sampleRate}")
+            
+            # get chunk data
+            audioChunk = audioData[metadataSize:]
             
             # Run async tasks concurrently
             tasks = [
-                asyncio.create_task(storageAudioChunks(data)),
-                asyncio.create_task(isSilent(data)),
-                asyncio.create_task(isNoisy(data)),
-                asyncio.create_task(asr(data))
+                asyncio.create_task(storageAudioChunks(chunkId, audioChunk)),
+                asyncio.create_task(isSilent(chunkId, audioChunk)),
+                asyncio.create_task(isNoisy(chunkId, audioChunk)),
+                asyncio.create_task(asr(chunkId, audioChunk))
             ]
             
             # Await all tasks to complete
