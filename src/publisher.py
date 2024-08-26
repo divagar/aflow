@@ -11,9 +11,9 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument("--host", default="127.0.0.1",
                     help="WebSocket server host")
-parser.add_argument("--port", default=9000, type=int,
+parser.add_argument("--port", default=3000, type=int,
                     help="WebSocket server port")
-parser.add_argument("--chunklength", default=2, type=int,
+parser.add_argument("--chunklength", default=20, type=int,
                     help="Audio chunk length in seconds")
 parser.add_argument(
     "--mode", choices=["offline", "realtime"], default="offline", help="Streaming mode")
@@ -165,7 +165,7 @@ class AFlowPublisher(WebSocketClient):
                 print(f"Starting the realtime audio stream via file mode")
                 audioChunkCount = 1
 
-                audioFile.seek(44)  # Typical WAV header length
+                audioFile.seek(44)  # skip WAV header length
 
                 while audioTotalDataSize > 0:
                     startTime = time.time()
